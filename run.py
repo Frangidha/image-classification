@@ -1,141 +1,91 @@
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-import keras
-from keras.models import Sequential
-from keras.layers import Dense, Conv2D, MaxPool2D, Flatten, Dropout
-from keras.preprocessing.image import ImageDataGenerator
-from keras.optimizers import Adam
-
-from sklearn.metrics import classification_report, confusion_matrix
-
-import tensorflow as tf
-
-import cv2
 import os
-
+import tensorflow as tf
+from tensorflow.keras import datasets, layers, models
+import matplotlib.pyplot as plt
 import numpy as np
+os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+(X_train, y_train), (X_test, y_test) = datasets.cifar10.load_data()
+X_train.shape
 
-labels = ['rugby', 'soccer']
-img_size = 224
-def get_data(data_dir):
-    data = [] 
-    for label in labels: 
-        path = os.path.join(data_dir, label)
-        class_num = labels.index(label)
-        for img in os.listdir(path):
-            try:
-                img_arr = cv2.imread(os.path.join(path, img))[...,::-1] #convert BGR to RGB format
-                resized_arr = cv2.resize(img_arr, (img_size, img_size)) # Reshaping images to preferred size
-                data.append([resized_arr, class_num])
-            except Exception as e:
-                print(e)
-    return np.array(data)
+tf.config.experimental.list_physical_devices()
 
-train = get_data('../input/traintestsports/Main/train')
-val = get_data('../input/traintestsports/Main/test')
+X_test.shape
 
-    l = []
-for i in train:
-    if(i[1] == 0):
-        l.append("rugby")
-    else
-        l.append("soccer")
-sns.set_style('darkgrid')
-sns.countplot(l)
+y_train.shape
 
-plt.figure(figsize = (5,5))
-plt.imshow(train[1][0])
-plt.title(labels[train[0][1]])
+y_train[:5]
 
-plt.figure(figsize = (5,5))
-plt.imshow(train[-1][0])
-plt.title(labels[train[-1][1]])
+y_train = y_train.reshape(-1,)
+y_train[:5]
+
+y_test = y_test.reshape(-1,)
+
+classes = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 
 
-x_train = []
-y_train = []
-x_val = []
-y_val = []
 
-for feature, label in train:
-  x_train.append(feature)
-  y_train.append(label)
-
-for feature, label in val:
-  x_val.append(feature)
-  y_val.append(label)
-
-# Normalize the data
-x_train = np.array(x_train) / 255
-x_val = np.array(x_val) / 255
-
-x_train.reshape(-1, img_size, img_size, 1)
-y_train = np.array(y_train)
-
-x_val.reshape(-1, img_size, img_size, 1)
-y_val = np.array(y_val)
-
-datagen = ImageDataGenerator(
-        featurewise_center=False,  # set input mean to 0 over the dataset
-        samplewise_center=False,  # set each sample mean to 0
-        featurewise_std_normalization=False,  # divide inputs by std of the dataset
-        samplewise_std_normalization=False,  # divide each input by its std
-        zca_whitening=False,  # apply ZCA whitening
-        rotation_range = 30,  # randomly rotate images in the range (degrees, 0 to 180)
-        zoom_range = 0.2, # Randomly zoom image 
-        width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
-        height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
-        horizontal_flip = True,  # randomly flip images
-        vertical_flip=False)  # randomly flip images
+def plot_sample(X, y, index):
+    plt.figure(figsize = (15, 2))
+    plt.imshow(X[index])
+    plt.xlabel(classes[y[index]])
+    plt.show()
 
 
-datagen.fit(x_train)
+plot_sample(X_train, y_train, 0)
 
-model = Sequential()
-model.add(Conv2D(32,3,padding="same", activation="relu", input_shape=(224,224,3)))
-model.add(MaxPool2D())
+plot_sample(X_train, y_train, 1)
 
-model.add(Conv2D(32, 3, padding="same", activation="relu"))
-model.add(MaxPool2D())
+X_train = X_train / 255.0
+X_test = X_test / 255.0
 
-model.add(Conv2D(64, 3, padding="same", activation="relu"))
-model.add(MaxPool2D())
-model.add(Dropout(0.4))
+ann = models.Sequential([
+        layers.Flatten(input_shape=(32,32,3)),
+        layers.Dense(3000, activation='relu'),
+        layers.Dense(1000, activation='relu'),
+        layers.Dense(10, activation='softmax')    
+    ])
 
-model.add(Flatten())
-model.add(Dense(128,activation="relu"))
-model.add(Dense(2, activation="softmax"))
+ann.compile(optimizer='SGD',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
 
-model.summary()
+ann.fit(X_train, y_train, epochs=5)
 
-opt = Adam(lr=0.000001)
-model.compile(optimizer = opt , loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True) , metrics = ['accuracy'])
+from sklearn.metrics import confusion_matrix , classification_report
+import numpy as np
+y_pred = ann.predict(X_test)
+y_pred_classes = [np.argmax(element) for element in y_pred]
 
-history = model.fit(x_train,y_train,epochs = 500 , validation_data = (x_val, y_val))
+print("Classification Report: \n", classification_report(y_test, y_pred_classes))
 
+cnn = models.Sequential([
+    layers.Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(32, 32, 3)),
+    layers.MaxPooling2D((2, 2)),
+    
+    layers.Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    
+    layers.Flatten(),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(10, activation='softmax')
+])
 
-acc = history.history['accuracy']
-val_acc = history.history['val_accuracy']
-loss = history.history['loss']
-val_loss = history.history['val_loss']
+cnn.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
 
-epochs_range = range(500)
+cnn.fit(X_train, y_train, epochs=10)
 
-plt.figure(figsize=(15, 15))
-plt.subplot(2, 2, 1)
-plt.plot(epochs_range, acc, label='Training Accuracy')
-plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-plt.legend(loc='lower right')
-plt.title('Training and Validation Accuracy')
+cnn.evaluate(X_test,y_test)
 
-plt.subplot(2, 2, 2)
-plt.plot(epochs_range, loss, label='Training Loss')
-plt.plot(epochs_range, val_loss, label='Validation Loss')
-plt.legend(loc='upper right')
-plt.title('Training and Validation Loss')
-plt.show()
+y_pred = cnn.predict(X_test)
+y_pred[:5]
 
-predictions = model.predict_classes(x_val)
-predictions = predictions.reshape(1,-1)[0]
-print(classification_report(y_val, predictions, target_names = ['Rugby (Class 0)','Soccer (Class 1)']))
+y_classes = [np.argmax(element) for element in y_pred]
+y_classes[:5]
+
+y_test[:5]
+
+plot_sample(X_test, y_test,3)
+
+classes[y_classes[3]]
